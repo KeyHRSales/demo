@@ -1,9 +1,7 @@
-# Gator's Dockside Benefits Enrollment (DEMO)
+# Gator's Dockside Benefits Enrollment (Demo)
 
-Demo only. Fake data. Built by Key HR.
+**Live demo:** https://keyhrsales.github.io/demo/
 
-- `index.html` - employee enrollment form
-- `admin.html` - Key HR admin view (admin key required)
-- `reference.html` - presentation and quick reference: https://keyhrsales.github.io/demo/reference.html
+An online open enrollment form built by Key HR. Employees choose their benefits, sign, and get a PDF copy. Each enrollment is saved to a private Google Sheet and Drive folder, and Key HR reviews submissions from a password-protected admin page.
 
-Submissions are saved by a Google Apps Script web app to a private Google Sheet and Drive folder.
+Demo only. All data is fake.
