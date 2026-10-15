@@ -1282,7 +1282,7 @@ function renderSide(){
   const b=$('#sum-tot');countTo(b,lastTot===null?total:lastTot,total);
   const nb=$('.nav-tot b');if(nb)countTo(nb,lastTot===null?total:lastTot,total);
   if(lastTot!==null&&lastTot!==total){b.classList.remove('bump');void b.offsetWidth;b.classList.add('bump');}lastTot=total;
-  $('#side').hidden=cur===0&&!submitted?false:false;
+  $('#side').hidden=!!submitted;
 }
 const PH='__APP'+'_URL__';document.querySelectorAll('a[href^="'+PH+'"]').forEach(a=>{const base=/^https:\/\/script\.google\.com\//.test(CONFIG.ENDPOINT)?CONFIG.ENDPOINT:'';a.href=base?a.getAttribute('href').replace(PH,base):'#';});
 const REDUCE=matchMedia('(prefers-reduced-motion: reduce)').matches;
