@@ -882,17 +882,17 @@ const money=v=>'$'+(+v||0).toLocaleString('en-US',{minimumFractionDigits:2,maxim
 const money0=v=>'$'+(+v||0).toLocaleString('en-US');
 const get=(p)=>p.split('.').reduce((o,k)=>o==null?o:o[k],S);
 const set=(p,v)=>{const ks=p.split('.');let o=S;for(let i=0;i<ks.length-1;i++)o=o[ks[i]];o[ks.at(-1)]=v;};
-const ageOn=(dob,on)=>{if(!dob)return null;const b=new Date(dob+'T00:00:00'),d=new Date(on+'T00:00:00');let a=d.getFullYear()-b.getFullYear();if(d.getMonth()<b.getMonth()||(d.getMonth()===b.getMonth()&&d.getDate()<b.getDate()))a--;return a;};
+const ageOn=(dob,on)=>{if(!dob||!ISO_RE.test(dob))return null;const b=new Date(dob+'T00:00:00'),d=new Date(on+'T00:00:00');let a=d.getFullYear()-b.getFullYear();if(d.getMonth()<b.getMonth()||(d.getMonth()===b.getMonth()&&d.getDate()<b.getDate()))a--;return a;};
 const band=(age,bounds)=>{let i=0;while(i<bounds.length&&age>=bounds[i])i++;return i;};
 const empAge=()=>ageOn(S.emp.dob,CONFIG.EFFECTIVE);
 const salary=()=>Math.max(0,+String(S.emp.salary).replace(/[^\d.]/g,'')||0);
 const fullName=p=>[p.first,p.mi,p.last].filter(Boolean).join(' ');
 const depName=d=>[d.first,d.last].filter(Boolean).join(' ')||'Unnamed dependent';
 const isSpouse=d=>d.rel==='Spouse';
-const fmtDate=s=>{if(!s)return'';const [y,m,d]=s.split('-');return `${m}/${d}/${y}`;};
+const fmtDate=s=>{if(!s)return'';if(!ISO_RE.test(s))return String(s);const [y,m,d]=s.split('-');return `${m}/${d}/${y}`;};
 const fmtSSN=v=>{const d=String(v||'').replace(/\D/g,'').slice(0,9);return d.length>5?`${d.slice(0,3)}-${d.slice(3,5)}-${d.slice(5)}`:d.length>3?`${d.slice(0,3)}-${d.slice(3)}`:d;};
 const maskSSN=v=>{const d=String(v||'').replace(/\D/g,'');return d.length===9?'***-**-'+d.slice(5):'';};
-const fmtPhone=v=>{const d=String(v||'').replace(/\D/g,'').slice(0,10);return d.length>6?`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`:d.length>3?`(${d.slice(0,3)}) ${d.slice(3)}`:d;};
+const fmtPhone=v=>{let d=String(v||'').replace(/\D/g,'');if(d.length===11&&d[0]==='1')d=d.slice(1);d=d.slice(0,10);return d.length>6?`(${d.slice(0,3)}) ${d.slice(3,6)}-${d.slice(6)}`:d.length>3?`(${d.slice(0,3)}) ${d.slice(3)}`:d;};
 const tierOf=cov=>{const ds=S.deps.filter(d=>cov.includes(d.id));const sp=ds.some(isSpouse),ch=ds.some(d=>!isSpouse(d));return sp&&ch?3:sp?1:ch?2:0;};
 const covNames=cov=>{const ds=S.deps.filter(d=>cov.includes(d.id)).map(depName);return ['You'].concat(ds).join(', ');};
 const pruneCov=()=>{const ids=S.deps.map(d=>d.id);['med','den','vis','acc','ci'].forEach(k=>S[k].cov=S[k].cov.filter(id=>ids.includes(id)));};
@@ -927,7 +927,27 @@ function costs(){
 /* ---------------- field builders ---------------- */
 let ERR={};
 /* ---------------- input rules: characters that can't belong in a field never appear ---------------- */
-const TODAY=new Date().toISOString().slice(0,10);
+const isoOf=d=>new Date(d-d.getTimezoneOffset()*6e4).toISOString().slice(0,10);
+const TODAY=isoOf(new Date());
+const SHIFT=y=>{const d=new Date();d.setFullYear(d.getFullYear()+y);return isoOf(d);};
+/* dates: typed as MM/DD/YYYY, stored as YYYY-MM-DD once complete */
+const ISO_RE=/^\d{4}-\d{2}-\d{2}$/;
+function maskDate(v,fin){v=String(v||'').trim();
+  if(/^\d{2}\/\d{2}-/.test(v)&&+v.slice(0,2)>12)v=v.slice(0,2)+v.slice(3);
+  const m=v.match(fin?/^(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})$/:/^(\d{4})-(\d{1,2})-(\d{2})$/);if(m)return m[2].padStart(2,'0')+'/'+m[3].padStart(2,'0')+'/'+m[1];
+  if(/^\d{4}[\/.\-]/.test(v)){const y=v.replace(/[^\d\/.\-]/g,'').replace(/[\/.]/g,'-').slice(0,10),q=y.match(/^(\d{4})-(\d{1,2})-(\d{2})$/);return q?q[2].padStart(2,'0')+'/'+q[3]+'/'+q[1]:y;}
+  const parts=v.split(/[\/.\-\s]+/);
+  const dg=parts.map((x,i)=>{x=x.replace(/\D/g,'');return(i<2&&i<parts.length-1&&x.length===1)?'0'+x:x;}).join('').slice(0,8);
+  let out=dg.length>4?dg.slice(0,2)+'/'+dg.slice(2,4)+'/'+dg.slice(4):dg.length>2?dg.slice(0,2)+'/'+dg.slice(2):dg;
+  if(/[\/.\-\s]$/.test(v)&&(dg.length===2||dg.length===4))out+='/';
+  return out;}
+function toISO(v){v=String(v||'').trim();if(ISO_RE.test(v))return realDate(v)?v:null;
+  const m=v.match(/^(\d{2})\/(\d{2})\/(\d{2}|\d{4})$/);if(!m)return null;
+  let y=m[3];if(y.length===2){const cy=new Date().getFullYear()%100;y=(+y>cy+1?'19':'20')+y;}
+  const iso=`${y}-${m[1]}-${m[2]}`;return realDate(iso)?iso:null;}
+function realDate(iso){const [y,m,d]=iso.split('-').map(Number);const t=new Date(y,m-1,d);return m>=1&&m<=12&&t.getFullYear()===y&&t.getMonth()===m-1&&t.getDate()===d;}
+const usDate=v=>ISO_RE.test(v||'')?(([y,m,d])=>`${m}/${d}/${y}`)(v.split('-')):String(v||'');
+const DATE_DEF={min:'1900-01-01',max:SHIFT(2)};
 const US_STATES='AL AK AZ AR CA CO CT DE DC FL GA HI ID IL IN IA KS KY LA ME MD MA MI MN MS MO MT NE NV NH NJ NM NY NC ND OH OK OR PA RI SC SD TN TX UT VT VA WA WV WI WY PR VI GU AS MP'.split(' ');
 const SAN={
   name:v=>v.replace(/[^A-Za-z\u00C0-\u024F' .\-]/g,'').replace(/\s{2,}/g,' ').replace(/^[\s.'-]+/,''),
@@ -936,7 +956,8 @@ const SAN={
   zip:v=>{const d=v.replace(/\D/g,'').slice(0,9);return d.length>5?d.slice(0,5)+'-'+d.slice(5):d;},
   email:v=>v.replace(/[\s,;<>()\[\]\\"]/g,''),
   money:v=>{let t=v.replace(/[^\d.]/g,'');const i=t.indexOf('.');if(i>=0)t=t.slice(0,i+1)+t.slice(i+1).replace(/\./g,'').slice(0,2);let [a,b]=t.split('.');a=(a||'').replace(/^0+(?=\d)/,'').slice(0,9).replace(/\B(?=(\d{3})+(?!\d))/g,',');return b!==undefined?(a||'0')+'.'+b:a;},
-  pct:v=>{const d=v.replace(/\D/g,'').slice(0,3);return d&&+d>100?'100':d;}
+  pct:v=>{const d=v.replace(/\D/g,'').slice(0,3);return d&&+d>100?'100':d;},
+  mbi:v=>v.replace(/[^A-Za-z0-9]/g,'').toUpperCase().slice(0,11)
 };
 /* keep the caret in the right place after cleaning; count the characters that survive */
 function cleanInput(t,fmt){
@@ -953,12 +974,12 @@ function cleanInput(t,fmt){
 function nudge(el){const f=el.closest('.f')||el;f.classList.remove('nudge');void f.offsetWidth;f.classList.add('nudge');clearTimeout(f._nt);f._nt=setTimeout(()=>f.classList.remove('nudge'),450);}
 
 function fld(k,label,o={}){
-  let v=get(k)??'';if(o.fmt==='money'&&v!=='')v=SAN.money(String(v));const id='f_'+k.replace(/\./g,'_'), e=showErr&&ERR[k];
+  let v=get(k)??'';if(o.type==='date'){o={...o,type:'text',mode:'numeric',ph:'MM/DD/YYYY',max:10,fmt:'date',ac:o.ac||'off'};v=usDate(v);}if(o.fmt==='money'&&v!=='')v=SAN.money(String(v));const id='f_'+k.replace(/\./g,'_'), e=showErr&&ERR[k];
   const req=o.req?'<span class="req" aria-hidden="true"> *</span>':'';
   let input;
   if(o.opts){input=`<select id="${id}" data-k="${k}"${o.req?' required':''}><option value="">Select</option>${o.opts.map(x=>{const [val,lab]=Array.isArray(x)?x:[x,x];return `<option value="${esc(val)}"${String(v)===String(val)?' selected':''}>${esc(lab)}</option>`;}).join('')}</select>`;}
   else if(o.area){input=`<textarea id="${id}" data-k="${k}">${esc(v)}</textarea>`;}
-  else input=`<input id="${id}" data-k="${k}" type="${o.type||'text'}" value="${esc(v)}"${o.ph?` placeholder="${esc(o.ph)}"`:''}${o.mode?` inputmode="${o.mode}"`:''}${o.ac?` autocomplete="${o.ac}"`:''}${o.max?` maxlength="${o.max}"`:''}${o.dmin?` min="${o.dmin}"`:''}${o.dmax?` max="${o.dmax}"`:''}${o.fmt?` data-fmt="${o.fmt}"`:''}${o.req?' required':''}${e?' aria-invalid="true"':''}>`;
+  else input=`<input id="${id}" data-k="${k}" type="${o.type||'text'}" value="${esc(v)}"${o.ph?` placeholder="${esc(o.ph)}"`:''}${o.mode?` inputmode="${o.mode}"`:''}${o.ac?` autocomplete="${o.ac}"`:''}${o.max?` maxlength="${o.max}"`:''}${o.dmin?` data-dmin="${o.dmin}"`:''}${o.dmax?` data-dmax="${o.dmax}"`:''}${o.fmt?` data-fmt="${o.fmt}"`:''}${o.req?' required':''}${e?' aria-invalid="true"':''}>`;
   return `<div class="f ${o.w||''}${e?' err':''}"><label for="${id}">${esc(label)}${req}</label>${input}${o.hint?`<span class="hint">${o.hint}</span>`:''}${e?`<span class="msg">${esc(e)}</span>`:''}</div>`;
 }
 function radios(k,opts,o={}){
@@ -980,7 +1001,7 @@ R.start=()=>`${head("Gator's Dockside open enrollment","Let's get you enrolled."
   <div class="card">
     <h2>Why are you completing this form?</h2>
     ${radios('event.type',[['Open Enrollment','Open enrollment'],['New Hire','New hire'],['Qualifying Life Event','Qualifying life event'],['Other','Other']],{label:'Enrollment event'})}
-    ${S.event.type==='Qualifying Life Event'?`<div class="grid">${fld('event.qle','Event',{req:1,w:'w3',opts:['Marriage','Birth','Adoption or placement for adoption','Court order','Loss of other coverage','Divorce or legal separation','Death of a dependent','Change in employment status','Other']})}${fld('event.qleDate','Date of event',{req:1,type:'date',w:'w3'})}</div><div class="callout"><b>You have 30 days from the event to make changes.</b> Key HR may ask for documentation, such as a marriage or birth certificate, court order or proof of lost coverage.</div>`:''}
+    ${S.event.type==='Qualifying Life Event'?`<div class="grid">${fld('event.qle','Event',{req:1,w:'w3',opts:['Marriage','Birth','Adoption or placement for adoption','Court order','Loss of other coverage','Divorce or legal separation','Death of a dependent','Change in employment status','Other']})}${fld('event.qleDate','Date of event',{req:1,type:'date',w:'w3',dmin:SHIFT(-2),dmax:SHIFT(1)})}</div><div class="callout"><b>You have 30 days from the event to make changes.</b> Key HR may ask for documentation, such as a marriage or birth certificate, court order or proof of lost coverage.</div>`:''}
     ${S.event.type==='Other'?`<div class="grid">${fld('event.other','Please describe',{req:1,w:'w6'})}</div>`:''}
   </div>
   <div class="card">
@@ -1012,7 +1033,7 @@ R.you=()=>`${head('Step 2','About you','We use this to set up your coverage. Fie
     ${fld('emp.phone','Phone',{req:1,type:'tel',fmt:'phone',ac:'tel',w:'w3'})}${fld('emp.email','Email',{req:1,type:'email',ac:'email',w:'w3',fmt:'email',max:80})}
   </div></div>
   <div class="card"><h2>Employment</h2><div class="grid">
-    ${fld('emp.hire','Date of hire',{req:1,type:'date',dmin:'1970-01-01',dmax:'2027-12-31'})}${fld('emp.job','Job title / location',{w:'w4'})}
+    ${fld('emp.hire','Date of hire',{req:1,type:'date',dmin:'1950-01-01',dmax:SHIFT(1)})}${fld('emp.job','Job title / location',{w:'w4'})}
     ${fld('emp.salary','Annual earnings ($)',{req:1,mode:'decimal',fmt:'money',ph:'38,000',hint:'Used to calculate life and disability amounts.',w:'w3'})}
   </div></div>`;
 
@@ -1144,7 +1165,7 @@ R.otherc=()=>`${head('Step 9','Other coverage','This helps the plans coordinate 
   <div class="card"><h2>Is anyone you're covering enrolled in Medicare?</h2>
     ${radios('mcare.has',[['no','No'],['yes','Yes']])}
     ${S.mcare.has==='yes'?`<div class="rows">${S.mcare.people.map((m,i)=>`<div class="row-card"><div class="row-head"><b>Medicare enrollee ${i+1}</b>${S.mcare.people.length>1?`<button type="button" class="ghost" data-delmc="${i}">Remove</button>`:''}</div><div class="grid">
-      ${fld(`mcare.people.${i}.name`,'Name',{req:1,w:'w3',fmt:'name',max:60})}${fld(`mcare.people.${i}.mbi`,'Medicare number (MBI)',{w:'w3'})}
+      ${fld(`mcare.people.${i}.name`,'Name',{req:1,w:'w3',fmt:'name',max:60})}${fld(`mcare.people.${i}.mbi`,'Medicare number (MBI)',{w:'w3',fmt:'mbi',max:11,ph:'1EG4TE5MK73'})}
       ${fld(`mcare.people.${i}.a`,'Part A effective',{type:'date'})}${fld(`mcare.people.${i}.b`,'Part B effective',{type:'date'})}${fld(`mcare.people.${i}.d`,'Part D effective',{type:'date'})}
       ${fld(`mcare.people.${i}.reason`,'Reason for eligibility',{req:1,w:'w6',opts:['Age','Disability','End-stage renal disease','Disability and end-stage renal disease']})}
     </div></div>`).join('')}</div>${S.mcare.people.length<4?'<button type="button" class="add" id="add-mc">+ Add another person</button>':''}`:''}</div>`;
@@ -1220,7 +1241,6 @@ V.you=()=>{const e=S.emp;need('emp.first','Enter your first name.');need('emp.la
   need('emp.marital','Choose your marital status.');need('emp.addr','Enter your mailing address.');need('emp.city','Enter your city.');need('emp.state','Enter your state.');
   if(e.state&&!US_STATES.includes(String(e.state).toUpperCase()))ERR['emp.state']='Enter a 2-letter state code, like FL.';
   if(e.dob&&e.dob>TODAY)ERR['emp.dob']="Date of birth can't be in the future.";
-  if(e.hire&&(e.hire<'1970-01-01'||e.hire>'2027-12-31'))ERR['emp.hire']='Check your date of hire.';
   if(!/^\d{5}(-?\d{4})?$/.test(e.zip.trim()))ERR['emp.zip']='Enter a valid ZIP code.';
   if(String(e.phone).replace(/\D/g,'').length!==10)ERR['emp.phone']='Enter a 10-digit phone number.';
   if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e.email.trim()))ERR['emp.email']='Enter a valid email address.';
@@ -1232,7 +1252,7 @@ V.family=()=>{let sp=0;S.deps.forEach((d,i)=>{const p=`deps.${i}.`;need(p+'first
   if(sp>1)ERR['deps.sp']='You can only list one spouse.';};
 V.medical=()=>{if(!S.med.plan)ERR['med.plan']='Choose a medical plan or waive coverage.';if(S.med.plan==='waive')need('med.waiveReason','Tell us why you are waiving medical coverage.');};
 V.dv=()=>{need('den.elect','Choose to enroll in or waive dental.');need('vis.elect','Choose to enroll in or waive vision.');};
-const benCheck=(key,label)=>{const L=get(key);L.forEach((b,i)=>{need(`${key}.${i}.name`,`Enter a name for ${label} beneficiary ${i+1}.`);need(`${key}.${i}.rel`,`Choose a relationship for ${label} beneficiary ${i+1}.`);if(!(+b.pct>0))ERR[`${key}.${i}.pct`]=`Enter a share for ${label} beneficiary ${i+1}.`;});
+const benCheck=(key,label)=>{const L=get(key);L.forEach((b,i)=>{need(`${key}.${i}.name`,`Enter a name for ${label} beneficiary ${i+1}.`);need(`${key}.${i}.rel`,`Choose a relationship for ${label} beneficiary ${i+1}.`);if(!(+b.pct>0))ERR[`${key}.${i}.pct`]=`Enter a share for ${label} beneficiary ${i+1}.`;if(b.phone&&String(b.phone).replace(/\D/g,'').length!==10)ERR[`${key}.${i}.phone`]='Enter a 10-digit phone number or leave it blank.';});
   const P=L.filter(b=>b.kind==='Primary'),C=L.filter(b=>b.kind==='Contingent');
   if(!P.length)ERR[key+'.p']=`Name at least one primary ${label} beneficiary.`;
   else if(P.reduce((a,b)=>a+(+b.pct||0),0)!==100)ERR[key+'.p']=`${label} primary shares must add up to 100%.`;
@@ -1252,7 +1272,14 @@ V.otherc=()=>{need('other.has','Tell us if you have other group coverage.');if(S
 V.review=()=>{if(!S.consent.payroll)ERR['consent.payroll']='Check the payroll deduction authorization.';if(!S.consent.edel)ERR['consent.edel']='Check the electronic delivery consent.';if(!S.consent.certify)ERR['consent.certify']='Check the certification.';
   need('sig.name','Type your full legal name.');if(S.sig.name&&S.emp.last&&!S.sig.name.toLowerCase().includes(S.emp.last.toLowerCase()))ERR['sig.name']='Your typed name should match the name on this form.';
   if(!sig.has())ERR['sig.img']='Sign in the signature box.';};
-function validate(i){ERR={};const f=V[STEPS[i].id];if(f)f();return !Object.keys(ERR).length;}
+function validate(i){ERR={};const f=V[STEPS[i].id];if(f)f();checkDates();return !Object.keys(ERR).length;}
+/* every date on the current step: complete, real, and in a sensible range */
+function checkDates(){$$('#view input[data-fmt="date"]').forEach(t=>{const k=t.dataset.k,v=String(get(k)||'').trim();if(!v)return;
+  const min=t.dataset.dmin||DATE_DEF.min,max=t.dataset.dmax||DATE_DEF.max,dob=/dob$/.test(k);
+  if(!ISO_RE.test(v)){const done=/^\d{2}\/\d{2}\/\d{4}$/.test(v);ERR[k]=done?"That date doesn't exist. Check the month and day.":'Enter the full date as MM/DD/YYYY.';return;}
+  if(v>max){if(!ERR[k]||!dob)ERR[k]=dob?"Date of birth can't be in the future.":`Enter a date on or before ${usDate(max)}.`;}
+  else if(v<min&&!ERR[k])ERR[k]=`Enter a date on or after ${usDate(min)}.`;});
+  S.mcare&&S.mcare.has==='yes'&&S.mcare.people.forEach((m,i)=>{if(m.mbi&&String(m.mbi).length!==11)ERR[`mcare.people.${i}.mbi`]='A Medicare number has 11 letters and numbers.';});}
 
 /* ---------------- signature pad ---------------- */
 const sig={c:null,ctx:null,drawn:false,has(){return this.drawn;},
@@ -1277,6 +1304,7 @@ let lastTot=null;
 function countTo(el,a,z){cancelAnimationFrame(el._raf);if(REDUCE||a===z){el.textContent=money(z);return;}
   const t0=performance.now(),d=600;const tick=t=>{const p=Math.min(1,(t-t0)/d),e=1-Math.pow(1-p,3);el.textContent=money(a+(z-a)*e);if(p<1)el._raf=requestAnimationFrame(tick);};el._raf=requestAnimationFrame(tick);}
 function renderSide(){
+  saveDraft();
   const {rows,total}=elections();
   $('#sum-list').innerHTML=rows.filter(r=>!/Pet|Basic Life/.test(r.k)).map(r=>`<li class="${r.waived?'waived':''}"><span>${esc(r.k)}</span><b>${r.waived?'-':r.cost?money(r.cost):'$0.00'}</b></li>`).join('');
   const b=$('#sum-tot');countTo(b,lastTot===null?total:lastTot,total);
@@ -1303,6 +1331,13 @@ function render(focus){
 }
 /* re-render only the dynamic parts without losing focus while typing */
 let rt=null;function soft(){clearTimeout(rt);rt=setTimeout(()=>{renderSide();},60);}
+/* progress survives a reload or crash in this tab; it is cleared when the tab closes or after submitting */
+const DRAFT='gd-enroll-draft',DONE='gd-enroll-done';
+const ss={get(k){try{return JSON.parse(sessionStorage.getItem(k));}catch(_){return null;}},set(k,v){try{sessionStorage.setItem(k,JSON.stringify(v));}catch(_){}},del(k){try{sessionStorage.removeItem(k);}catch(_){}}};
+let svT=null;function saveDraft(){clearTimeout(svT);svT=setTimeout(()=>{if(submitted==='sent'||submitted==='test')return;if(!(maxReached>0||S.emp.first||S.event.type))return;ss.set(DRAFT,{S,cur,maxReached,depSeq});},250);}
+function restoreDraft(){const d=ss.get(DRAFT);if(!d||!d.S)return false;S=Object.assign(blank(),d.S);cur=Math.max(0,Math.min(d.cur||0,STEPS.length-1));maxReached=Math.max(cur,d.maxReached||0);depSeq=d.depSeq||depSeq;return true;}
+function toast(msg){const t=document.createElement('div');t.setAttribute('role','status');t.style.cssText='position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:9999;max-width:min(92vw,520px);background:#17201d;color:#fff;font:500 15px/1.4 var(--font-body);padding:14px 44px 14px 18px;border-radius:10px;box-shadow:0 12px 30px -10px rgba(0,0,0,.5)';
+  if(matchMedia('(max-width:640px)').matches)t.style.bottom='96px';t.textContent=msg;const x=document.createElement('button');x.type='button';x.setAttribute('aria-label','Close');x.textContent='\u00d7';x.style.cssText='position:absolute;right:10px;top:8px;background:none;border:0;color:#fff;font-size:22px;cursor:pointer';x.onclick=()=>t.remove();t.appendChild(x);document.body.appendChild(t);setTimeout(()=>t.remove(),8000);}
 
 /* ---------------- events ---------------- */
 const view=$('#view');
@@ -1310,8 +1345,10 @@ view.addEventListener('input',e=>{
   const t=e.target,k=t.dataset.k;if(!k||t.type==='radio'||t.type==='checkbox'||t.tagName==='SELECT')return;
   if(t.dataset.fmt==='ssn'){const p=t.selectionStart,ol=t.value.length;t.value=fmtSSN(t.value);try{t.setSelectionRange(p+(t.value.length-ol),p+(t.value.length-ol));}catch(_){}}
   if(t.dataset.fmt==='phone'){const b=t.value.replace(/[\d\s()+.-]/g,'');t.value=fmtPhone(t.value);if(b)nudge(t);}
+  if(t.dataset.fmt==='date'){const b=t.value,atEnd=(t.selectionStart||0)>=b.length,n=b.slice(0,t.selectionStart||0).replace(/\D/g,'').length;t.value=maskDate(b);
+    if(!atEnd){let i=0,c=0;while(i<t.value.length&&c<n){if(/\d/.test(t.value[i]))c++;i++;}try{t.setSelectionRange(i,i);}catch(_){}}if(/[^\d\/.\-\s]/.test(b))nudge(t);}
   if(SAN[t.dataset.fmt])cleanInput(t,t.dataset.fmt);
-  set(k,t.dataset.fmt==='money'?t.value.replace(/,/g,''):t.value);
+  set(k,t.dataset.fmt==='money'?t.value.replace(/,/g,''):t.dataset.fmt==='date'?(toISO(t.value)||t.value):t.value);
   if(WK.includes(k)&&S._waivedAll){S._waivedAll=false;S._waiveSnap=null;}
   if(showErr&&ERR[k]){const f=t.closest('.f');if(f){f.classList.remove('err');const m=f.querySelector('.msg');if(m)m.remove();}delete ERR[k];}
   soft();
@@ -1330,6 +1367,7 @@ view.addEventListener('change',e=>{
   const k=t.dataset.k;if(!k)return;
   let v=t.type==='checkbox'?t.checked:t.value;
   if(t.dataset.fmt==='money')v=String(v).replace(/,/g,'');
+  if(t.dataset.fmt==='date'){t.value=maskDate(t.value,1);const iso=toISO(t.value);v=iso||t.value;if(iso)t.value=usDate(iso);}
   if(WK.includes(k)&&S._waivedAll){S._waivedAll=false;S._waiveSnap=null;}
   if(['life.emp','life.sp','ci.amt'].includes(k))v=+v||0;
   set(k,v);
@@ -1362,7 +1400,7 @@ view.addEventListener('click',e=>{
   if(t.id==='sig-clear'){sig.clear();return;}
   if(t.id==='pdf-dl')return downloadPDF();
   if(t.id==='retry')return send();
-  if(t.id==='new-enroll'){if(confirm('Start a new enrollment? This clears the current form from this screen. Download your PDF first if you need it.')){S=blank();cur=0;maxReached=0;submitted=false;showErr=false;sig.clear();sig.img='';pdfCache=null;lastTot=null;render(true);}return;}
+  if(t.id==='new-enroll'){if(confirm('Start a new enrollment? This clears the current form from this screen. Download your PDF first if you need it.')){ss.del(DRAFT);ss.del(DONE);S=blank();cur=0;maxReached=0;submitted=false;showErr=false;sig.clear();sig.img='';pdfCache=null;lastTot=null;render(true);}return;}
 });
 $('#steps').addEventListener('click',e=>{const b=e.target.closest('[data-step]');if(!b||submitted)return;const i=+b.dataset.step;if(i<=maxReached&&i!==cur){showErr=false;cur=i;render(true);}});
 
@@ -1463,18 +1501,20 @@ async function finish(){
   await send();
 }
 async function send(){
-  if(!GAS&&!/^https:\/\/script\.google\.com\//.test(CONFIG.ENDPOINT)){submitted='test';render(true);return;}
+  if(!GAS&&!/^https:\/\/script\.google\.com\//.test(CONFIG.ENDPOINT)){submitted='test';ss.del(DRAFT);render(true);return;}
   const b=$('#retry');if(b){b.disabled=true;b.textContent='Sending...';}
   try{
     const pdf=pdfCache?pdfCache.output('datauristring').split(',')[1]:'';
     const j=await api({action:'submit',record:record(),pdf,filename:pdfName()});if(!j.ok)throw new Error(j.error||'Not saved');
-    submitted='sent';
+    submitted='sent';ss.del(DRAFT);ss.set(DONE,{conf:S.conf});
   }catch(err){console.error(err);submitted='fail';}
   render(true);
 }
 
 window.addEventListener('beforeunload',e=>{if((maxReached>0||S.emp.first)&&submitted!=='sent'){e.preventDefault();e.returnValue='';}});
-render();
+const restored=restoreDraft();render();
+if(restored)toast('Welcome back. Your progress was restored.'+(cur===STEPS.length-1?' Please sign again before submitting.':''));
+else{const d=ss.get(DONE);if(d&&d.conf)toast(`You already submitted enrollment ${d.conf} in this tab. Fill this out again only if you need to make a change.`);}
 })();
 </script>
 </body>
