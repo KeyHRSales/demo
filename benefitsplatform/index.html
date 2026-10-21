@@ -535,6 +535,31 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-betw
 .mm-list{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(0,1fr);gap:16px;align-items:start}
 .mm-list table th{font-weight:600}
 @media (max-width:760px){.mm-list{grid-template-columns:1fr}}
+
+/* ---------- motion: subtle enhancements ---------- */
+@keyframes panelIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+.panel:not([hidden]){animation:panelIn .45s cubic-bezier(.2,.7,.2,1) both}
+.sub:not([hidden]),.acct-pane:not([hidden]){animation:panelIn .35s cubic-bezier(.2,.7,.2,1) both}
+details[open] .inner{animation:fadeIn .35s ease both}
+.rail{transition:box-shadow .3s ease}
+.rail.scrolled{box-shadow:0 8px 20px -14px rgba(0,0,0,.35)}
+.tab,.sidenav button,.jump button,.seg button,.rx-tierbtns button,.acct-nav button,.lang{transition:background-color .25s ease,color .25s ease,border-color .25s ease,box-shadow .25s ease}
+.btn{transition:transform .2s ease,box-shadow .2s ease,background-color .2s ease,filter .2s ease}
+.btn:hover{transform:translateY(-1px);box-shadow:0 8px 18px -10px rgba(184,50,44,.55)}
+.btn.ghost:hover{box-shadow:0 8px 18px -12px rgba(0,0,0,.3)}
+.btn:active{transform:translateY(0)}
+.stat,.carrier-tile,.step,.contact,.why3 .box,.term,.gains .box,.kv div{transition:transform .25s ease,box-shadow .25s ease,border-color .25s ease}
+.stat:hover,.carrier-tile:hover,.step:hover,.contact:hover,.why3 .box:hover,.gains .box:hover{transform:translateY(-3px);box-shadow:0 12px 26px -16px rgba(0,0,0,.3)}
+.hero-photo img{transition:transform 1.2s cubic-bezier(.2,.7,.2,1)}
+.hero-photo:hover img{transform:scale(1.03)}
+.checks li::before{transition:transform .3s ease,background-color .3s ease}
+.checks li:hover::before{transform:scale(1.1);background:var(--red)}
+.anim .rv{opacity:0;transform:translateY(16px);transition:opacity .6s ease,transform .7s cubic-bezier(.2,.7,.2,1)}
+.anim .hero-photo.rv{transform:scale(.97)}
+.anim .rv.in{opacity:1;transform:none}
+@media print{.anim .rv{opacity:1!important;transform:none!important}}
+@media (prefers-reduced-motion:reduce){.panel:not([hidden]),.sub:not([hidden]),.acct-pane:not([hidden]),details[open] .inner{animation:none}.anim .rv{opacity:1;transform:none}}
 </style>
 </head>
 <body>
@@ -1725,5 +1750,45 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-betw
 })();
 </script>
 
+<script>
+/* Motion: scroll reveals, count-up stats, sticky rail shadow. Purely visual; content works without it. */
+(function(){
+  const rail=document.querySelector('.rail');
+  const onScroll=()=>{ if(rail) rail.classList.toggle('scrolled',window.scrollY>8); };
+  window.addEventListener('scroll',onScroll,{passive:true}); onScroll();
+  if(matchMedia('(prefers-reduced-motion: reduce)').matches || !('IntersectionObserver' in window)) return;
+  const SEL=['.hero-copy > *','.hero-photo','.section-head','.stat','.guide','.step','.gains > .box','.enroll','.disclaim','.carrier-tile','.mm-cover','.mm-close','.why3 > .box','.contact','.g-grid > .term','.block-body > *','.stack > .tbl','.callout','.fn-note','.provider-box','.rx-find','.rx-dl-box','.help'].join(',');
+  let els=[...document.querySelectorAll(SEL)];
+  const set=new Set(els);
+  els=els.filter(el=>!els.some(o=>o!==el&&el.contains(o)&&set.has(o)));
+  document.documentElement.classList.add('anim');
+  els.forEach(el=>el.classList.add('rv'));
+  const fmt=(n,dec,comma)=>{ let t=n.toFixed(dec); if(comma){ const [a,b]=t.split('.'); t=a.replace(/\B(?=(\d{3})+(?!\d))/g,',')+(b?'.'+b:''); } return t; };
+  function countUp(b){
+    const node=[...b.childNodes].find(n=>n.nodeType===3); if(!node) return;
+    const final=node.nodeValue, m=final.match(/^(\D*)([\d,]+(?:\.\d+)?)(.*)$/); if(!m) return;
+    const target=parseFloat(m[2].replace(/,/g,'')), dec=(m[2].split('.')[1]||'').length, comma=m[2].includes(',');
+    const t0=performance.now(), dur=1300;
+    (function tick(now){
+      const k=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-k,3);
+      node.nodeValue=k<1?m[1]+fmt(target*e,dec,comma)+m[3]:final;
+      if(k<1) requestAnimationFrame(tick);
+    })(t0);
+  }
+  const io=new IntersectionObserver(entries=>{
+    entries.forEach(en=>{
+      if(!en.isIntersecting) return;
+      const el=en.target; io.unobserve(el);
+      const sibs=[...el.parentElement.children].filter(c=>c.classList.contains('rv'));
+      const delay=Math.min(Math.max(0,sibs.indexOf(el)),6)*70;
+      el.style.transitionDelay=delay+'ms';
+      requestAnimationFrame(()=>el.classList.add('in'));
+      if(el.classList.contains('stat')){ const b=el.querySelector('b'); if(b) setTimeout(()=>countUp(b),delay+150); }
+      setTimeout(()=>{ el.classList.remove('rv','in'); el.style.transitionDelay=''; },delay+800);
+    });
+  },{threshold:0.12,rootMargin:'0px 0px -6% 0px'});
+  els.forEach(el=>io.observe(el));
+})();
+</script>
 </body>
 </html>
