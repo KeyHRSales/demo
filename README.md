@@ -5,6 +5,7 @@ An online open enrollment form built by Key HR. Employees choose their benefits,
 - **Enrollment form:** https://keyhrsales.github.io/demo/
 - **Slideshow:** https://keyhrsales.github.io/demo/slideshow/
 - **Reference sheet:** https://keyhrsales.github.io/demo/reference/
+- **Benefits platform:** https://keyhrsales.github.io/demo/benefitsplatform/ (sample plans and benefits for prospects, English and Spanish)
 
 Key HR admin: https://keyhrsales.github.io/demo/admin/
 Key HR staff (enroll for an employee): https://keyhrsales.github.io/demo/staff/
