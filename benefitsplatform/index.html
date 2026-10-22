@@ -669,7 +669,7 @@ details[open] .inner{animation:fadeIn .35s ease both}
       <h2>Big-company benefits, <em>built for your team.</em></h2>
       <p class="lead">Top talent gravitates toward employers who truly invest in their well-being. Key HR empowers businesses of all sizes to compete like Fortune 500 companies, delivering premier medical, dental, vision, life and wellness plans without the enterprise price tag. Backed by unmatched buying power, seamless compliance and a dedicated team of specialists, we make it effortless to keep your workforce healthy and happy.</p>
       <div class="hero-cta">
-        <button type="button" class="btn" id="open-plans" aria-haspopup="dialog">Explore sample plans &rarr;</button>
+        <button type="button" class="btn" id="open-plans" data-open-plans aria-haspopup="dialog">Explore sample plans &rarr;</button>
         <a class="btn ghost" href="mailto:sales@keyhro.com?subject=Employee%20benefits%20for%20my%20team">Talk to Key HR</a>
       </div>
       <div class="facts">
@@ -790,6 +790,7 @@ details[open] .inner{animation:fadeIn .35s ease both}
       <li class="carrier-tile"><b data-notr>Blue Cross Blue Shield</b></li>
     </ul>
     <p class="note">Carrier availability varies by state, location and group size.</p>
+    <div class="hero-cta"><button type="button" class="btn" data-open-plans aria-haspopup="dialog">Explore sample plans &rarr;</button></div>
   </div>
   <div class="section-head mm-intro">
     <span class="eyebrow">Major medical</span>
@@ -1947,11 +1948,12 @@ details[open] .inner{animation:fadeIn .35s ease both}
 <script>
 /* Sample plans pop-up */
 (function(){
-  const dlg=document.getElementById('plans-modal'), open=document.getElementById('open-plans');
-  if(!dlg||!open) return;
-  if(typeof dlg.showModal!=='function'){ open.addEventListener('click',()=>{ const t=document.querySelector('.rail [data-tab="medical"]'); if(t) t.click(); }); return; }
-  open.addEventListener('click',()=>{ dlg.showModal(); document.body.style.overflow='hidden'; });
-  dlg.addEventListener('close',()=>{ document.body.style.overflow=''; open.focus({preventScroll:true}); });
+  const dlg=document.getElementById('plans-modal'), openers=[...document.querySelectorAll('[data-open-plans]')];
+  if(!dlg||!openers.length) return;
+  if(typeof dlg.showModal!=='function'){ openers.forEach(o=>o.addEventListener('click',()=>{ const t=document.querySelector('.rail [data-tab="medical"]'); if(t) t.click(); })); return; }
+  let last=null;
+  openers.forEach(o=>o.addEventListener('click',()=>{ last=o; dlg.showModal(); document.body.style.overflow='hidden'; }));
+  dlg.addEventListener('close',()=>{ document.body.style.overflow=''; if(last) last.focus({preventScroll:true}); });
   dlg.querySelectorAll('[data-close-plans],#close-plans').forEach(b=>b.addEventListener('click',()=>dlg.close()));
   dlg.addEventListener('click',e=>{ if(e.target===dlg) dlg.close(); });
 })();
