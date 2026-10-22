@@ -561,6 +561,12 @@ footer .wrap{display:flex;flex-wrap:wrap;gap:8px 24px;justify-content:space-betw
 .pm-foot{display:flex;flex-wrap:wrap;gap:10px;justify-content:flex-end;padding:14px 24px;border-top:1px solid var(--line);background:var(--surface)}
 @media (max-width:640px){.pm-head,.pm-body,.pm-foot{padding-inline:16px}.pm-foot .btn{flex:1 1 auto;justify-content:center}}
 @media (prefers-reduced-motion:reduce){.plans-modal[open],.plans-modal::backdrop{animation:none}}
+.pm-foot-split{justify-content:space-between;align-items:center}
+.pm-sample{margin:0;font-size:.86rem;color:var(--ink-2);max-width:46ch}
+.pm-sample b,.pm-star{color:var(--red)}
+.pm-star{font-size:.6em;vertical-align:super;margin-left:2px}
+.pm-actions{display:flex;flex-wrap:wrap;gap:10px}
+@media (max-width:640px){.pm-actions{flex:1 1 100%}.pm-actions .btn{flex:1 1 auto;justify-content:center}}
 .contact-modal{width:min(680px,calc(100vw - 32px))}
 .cm-body{padding:0;background:#fff}
 .cm-form{padding:20px 24px;min-height:200px}
@@ -1671,7 +1677,7 @@ details[open] .inner{animation:fadeIn .35s ease both}
 
 <dialog class="plans-modal" id="plans-modal" aria-labelledby="plans-modal-h">
   <div class="pm-head">
-    <div><span class="sample-pill">Sample plans</span><h2 id="plans-modal-h">Sample Major Medical Plans</h2><p>Four sample UnitedHealthcare plan designs, side by side.</p></div>
+    <div><span class="sample-pill">Sample plans</span><h2 id="plans-modal-h">Sample Major Medical Plans<span class="pm-star">*</span></h2><p>Four sample UnitedHealthcare plan designs, side by side.</p></div>
     <button type="button" class="pm-close" id="close-plans" aria-label="Close">&times;</button>
   </div>
   <div class="pm-body">
@@ -1681,11 +1687,11 @@ details[open] .inner{animation:fadeIn .35s ease both}
   </table></div>
     <p class="note"><b>*HSA (Health Savings Account)</b> - This plan is HSA eligible.</p>
     <div class="callout"><b>EPO or POS?</b> EPO plans generally cover in-network care only, except emergencies. The POS plan also includes out-of-network coverage, usually at a higher cost to you.</div>
-    <p class="note">Sample for illustration only. Your actual plan details would be replaced here.</p>
   </div>
-  <div class="pm-foot">
-    <button type="button" class="btn" data-go="medical" data-close-plans>See Major Medical details &rarr;</button>
-    <button type="button" class="btn ghost" data-close-plans>Close</button>
+  <div class="pm-foot pm-foot-split">
+    <p class="pm-sample"><b>*</b> Sample for illustration only. Your actual plan details would be replaced here.</p>
+    <div class="pm-actions"><button type="button" class="btn" data-go="medical" data-close-plans>See Major Medical details &rarr;</button>
+    <button type="button" class="btn ghost" data-close-plans>Close</button></div>
   </div>
 </dialog>
 
